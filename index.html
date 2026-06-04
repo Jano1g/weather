@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Weather Station</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;800&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"/>
+<style>
+  :root {
+    --bg: #0a0f1a;
+    --surface: #0f1824;
+    --card: #131d2e;
+    --border: #1e2d42;
+    --accent-temp:  #ff6b35;
+    --accent-hum:   #00c9a7;
+    --accent-light: #ffd166;
+    --accent-pres:  #7b9cff;
+    --accent-rain:  #4dd0e1;
+    --accent-wifi:  #35e3a5;
+    --accent-up:    #ff9f43;
+    --text: #e8f0fe;
+    --muted: #5a7a99;
+    --grid: rgba(30,45,66,0.5);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── SETUP SCREEN ── */
+  #setupScreen {
+    position: fixed; inset: 0; z-index: 100;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem;
+  }
+  #setupScreen::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .setup-box {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    width: 100%; max-width: 460px;
+    animation: fadeUp 0.4s ease;
+  }
+  .setup-logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.6rem;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.3rem;
+  }
+  .setup-logo span { color: var(--accent-temp); }
+  .setup-sub {
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .field-group { margin-bottom: 1.2rem; }
+  .field-group label {
+    display: block;
+    font-size: 0.63rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+  }
+  .field-group input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.65rem 0.9rem;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field-group input:focus { border-color: var(--accent-hum); }
+  .field-group input::placeholder { color: #2e4460; }
+  .connect-btn {
+    width: 100%;
+    margin-top: 0.4rem;
+    background: var(--accent-hum);
+    color: #0a0f1a;
+    border: none;
+    border-radius: 8px;
+    padding: 0.78rem;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .connect-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+  .connect-btn:active { transform: translateY(0); }
+  .setup-error {
+    margin-top: 0.8rem;
+    font-size: 0.68rem;
+    color: var(--accent-temp);
+    text-align: center;
+    min-height: 1rem;
+  }
+  .setup-hint {
+    margin-top: 1.2rem;
+    font-size: 0.62rem;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.6;
+  }
+  .setup-hint a { color: var(--accent-pres); text-decoration: none; }
+
+  /* ── LOADING ── */
+  .loading-overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: var(--bg);
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 1rem;
+    font-size: 0.72rem; color: var(--muted); letter-spacing: 0.1em;
+  }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent-hum);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── DASHBOARD ── */
+  #dashboard { display: none; position: relative; z-index: 1; }
+  .container {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 2.5rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .site-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(1.6rem, 4vw, 2.4rem);
+    letter-spacing: -0.03em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .site-title span { color: var(--accent-temp); }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.45rem; }
+  .status-bar {
+    display: flex; align-items: center; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    flex-wrap: wrap;
+  }
+  .status-uptime { color: var(--accent-up); letter-spacing: 0.06em; }
+  .status-wifi-line {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.64rem;
+    color: #7ea0bd;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .wifi-top-icon {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.16rem;
+    height: 13px;
+  }
+  .wifi-top-icon span {
+    width: 4px;
+    border-radius: 3px;
+    background: #274258;
+    opacity: 0.45;
+    transition: background 0.2s, box-shadow 0.2s, opacity 0.2s;
+  }
+  .wifi-top-icon span:nth-child(1){ height: 4px; }
+  .wifi-top-icon span:nth-child(2){ height: 7px; }
+  .wifi-top-icon span:nth-child(3){ height: 10px; }
+  .wifi-top-icon span:nth-child(4){ height: 13px; }
+  .wifi-top-icon span.on { opacity: 1; animation: pulse 2s infinite; }
+  .status-wifi-line.wifi-excellent { color: #00e676; }
+  .status-wifi-line.wifi-excellent .wifi-top-icon span.on { background:#00e676; box-shadow: 0 0 8px #00e67688; }
+  .status-wifi-line.wifi-good { color: #35e3a5; }
+  .status-wifi-line.wifi-good .wifi-top-icon span.on { background:#35e3a5; box-shadow: 0 0 7px #35e3a566; }
+  .status-wifi-line.wifi-fair { color: #ffd166; }
+  .status-wifi-line.wifi-fair .wifi-top-icon span.on { background:#ffd166; box-shadow: 0 0 7px #ffd16666; }
+  .status-wifi-line.wifi-weak { color: #ff6b35; }
+  .status-wifi-line.wifi-weak .wifi-top-icon span.on { background:#ff6b35; box-shadow: 0 0 7px #ff6b3566; }
+  .status-wifi-text { white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background 0.4s; }
+  .dot.live  { background: #00e676; box-shadow: 0 0 8px #00e67688; animation: pulse 2s infinite; }
+  .dot.stale { background: var(--accent-temp); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .channel-badge {
+    font-size: 0.62rem; color: var(--muted);
+  }
+  .channel-badge span { color: var(--accent-pres); }
+  .settings-btn {
+    background: none; border: 1px solid var(--border);
+    border-radius: 6px; padding: 0.22rem 0.55rem;
+    color: var(--muted); font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem; cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: border-color 0.2s, color 0.2s;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .settings-btn:hover { border-color: var(--accent-hum); color: var(--accent-hum); }
+
+  /* ── BIG CARDS ── */
+  .big-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .big-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.15rem 1.25rem;
+    min-height: 158px;
+    position: relative; overflow: hidden;
+    transition: transform 0.2s;
+    animation: fadeUp 0.5s ease both;
+  }
+  .big-card:hover { transform: translateY(-2px); }
+  .big-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    border-radius: 12px 12px 0 0;
+  }
+  .big-card.temp::before  { background: var(--accent-temp); }
+  .big-card.hum::before   { background: var(--accent-hum); }
+  .big-card.light::before { background: var(--accent-light); }
+  .big-card.pres::before  { background: var(--accent-pres); }
+  .big-card.rain::before  { background: var(--accent-rain); }
+  .big-card.wifi::before  { background: var(--accent-wifi); }
+  .big-card.up::before    { background: var(--accent-up); }
+
+  .card-icon  { font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .card-label { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.5rem; }
+  .card-value {
+    font-family: 'Syne', sans-serif; font-weight: 800;
+    font-size: clamp(1.7rem, 3.7vw, 2.45rem);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+    display: flex;
+    align-items: baseline;
+    gap: 0.18rem;
+    white-space: nowrap;
+  }
+  .card-unit { font-size: 0.72rem; font-weight: 500; color: var(--muted); margin-left: 0; }
+  .card-sub  { margin-top: 0.5rem; font-size: 0.6rem; color: var(--muted); }
+
+  .big-card.temp  .card-value { color: var(--accent-temp); }
+  .big-card.hum   .card-value { color: var(--accent-hum); }
+  .big-card.light .card-value { color: var(--accent-light); }
+  .big-card.pres  .card-value { color: var(--accent-pres); }
+  .big-card.rain  .card-value { color: var(--accent-rain); }
+  .big-card.wifi  .card-value { color: var(--accent-wifi); }
+  .big-card.up    .card-value { color: var(--accent-up); }
+  .big-card.pres .card-value {
+    font-size: clamp(1.25rem, 2.6vw, 1.85rem);
+    letter-spacing: -0.015em;
+    gap: 0.12rem;
+    white-space: normal;
+    flex-wrap: wrap;
+  }
+  .big-card.pres .card-unit { font-size: 0.66rem; }
+  .big-card.rain .card-value { justify-content: flex-start; }
+  .big-card.up .card-value { font-size: clamp(1.05rem, 2.2vw, 1.45rem); letter-spacing: -0.01em; }
+  .big-card.wifi .card-value { font-size: clamp(1.2rem, 2.5vw, 1.7rem); }
+
+
+  /* ── CHARTS ── */
+  .charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  @media(max-width:700px){ .charts { grid-template-columns: 1fr; } }
+
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem 1.4rem;
+  }
+  .graph-window {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 1rem;
+  }
+  .graph-window-title {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.55rem;
+  }
+  .graph-window-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto auto;
+    gap: 0.55rem;
+    align-items: end;
+  }
+  .graph-window .field label {
+    display: block;
+    font-size: 0.58rem;
+    color: var(--muted);
+    margin-bottom: 0.28rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .graph-window input {
+    width: 100%;
+    background: #0b1320;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 0.42rem 0.5rem;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    outline: none;
+  }
+  .graph-window-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 0.42rem 0.62rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    height: fit-content;
+  }
+  .graph-window-btn:hover { border-color: var(--accent-hum); color: var(--accent-hum); }
+  @media(max-width:760px){ .graph-window-controls { grid-template-columns: 1fr; } }
+  .chart-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+    flex-wrap: wrap;
+  }
+  .chart-title { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+  canvas { width: 100% !important; display: block; }
+  .chart-range {
+    display: flex;
+    align-items: center;
+    gap: 0.36rem;
+  }
+  .range-inputs {
+    display: flex;
+    gap: 0.32rem;
+  }
+  .range-inputs input {
+    width: 68px;
+    background: #0b1320;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.28rem 0.36rem;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.64rem;
+    outline: none;
+  }
+  .flatpickr-calendar {
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .flatpickr-months .flatpickr-month,
+  .flatpickr-current-month .flatpickr-monthDropdown-months,
+  .flatpickr-current-month input.cur-year {
+    color: var(--text);
+    fill: var(--text);
+  }
+  .flatpickr-weekdays,
+  span.flatpickr-weekday {
+    background: transparent;
+    color: var(--muted);
+  }
+  .flatpickr-day {
+    color: #b0c8e8;
+    border-radius: 6px;
+  }
+  .flatpickr-day.today {
+    border-color: var(--accent-pres);
+    color: var(--accent-pres);
+  }
+  .flatpickr-day.selected,
+  .flatpickr-day.startRange,
+  .flatpickr-day.endRange {
+    background: var(--accent-pres);
+    border-color: var(--accent-pres);
+    color: #0a0f1a;
+  }
+  .flatpickr-day.inRange {
+    background: #1f3250;
+    border-color: #1f3250;
+    color: #cfe1ff;
+  }
+  .flatpickr-time input,
+  .flatpickr-time .flatpickr-am-pm {
+    color: var(--text);
+    background: var(--surface);
+  }
+  .flatpickr-time input:hover,
+  .flatpickr-time .flatpickr-am-pm:hover {
+    background: #111d2a;
+  }
+  .flatpickr-current-month input.cur-year,
+  .numInputWrapper span.arrowUp,
+  .numInputWrapper span.arrowDown {
+    color: var(--text);
+  }
+  #altitudeM { width: 78px; }
+  .range-inputs input::placeholder { color: #3d5470; }
+  .range-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.27rem 0.44rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .range-btn:hover { border-color: var(--accent-hum); color: var(--accent-hum); }
+
+  @media(max-width:760px){
+    .container { padding: 1rem 0.75rem 2rem; }
+    header { margin-bottom: 1.2rem; }
+    .site-title {
+      font-size: clamp(0.95rem, 8vw, 1.55rem);
+      letter-spacing: -0.02em;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      max-width: 100%;
+    }
+    .header-right { width: 100%; align-items: flex-start; gap: 0.35rem; }
+    .status-bar, .channel-badge { font-size: 0.62rem; }
+    .settings-btn { font-size: 0.58rem; padding: 0.25rem 0.45rem; }
+
+    .big-cards { gap: 0.7rem; }
+    .big-card { min-height: 132px; padding: 0.9rem 0.95rem; }
+    .card-value { font-size: clamp(1.45rem, 8vw, 2rem); }
+    .big-card.pres .card-value { font-size: clamp(1.05rem, 6vw, 1.35rem); }
+
+    .graph-window { padding: 0.7rem 0.75rem; }
+    .graph-window-title { margin-bottom: 0.45rem; }
+    .graph-window-controls { gap: 0.45rem; }
+    .graph-window-btn { width: 100%; text-align: center; padding: 0.5rem 0.6rem; }
+
+    .chart-card { padding: 0.85rem 0.9rem; }
+    .chart-head { gap: 0.5rem; }
+    .chart-title { width: 100%; }
+    .chart-range { width: 100%; justify-content: space-between; }
+    .range-inputs { flex: 1; gap: 0.3rem; }
+    .range-inputs input { width: 100%; min-width: 0; }
+    #altitudeM { max-width: 92px; }
+    .range-btn { padding: 0.33rem 0.44rem; font-size: 0.56rem; }
+
+    .history-card { padding: 0.85rem 0.9rem; }
+    table { font-size: 0.66rem; }
+    th, td { padding-right: 0.45rem; }
+  }
+
+  @media(max-width:420px){
+    .site-title {
+      font-size: clamp(0.85rem, 7.2vw, 1.2rem);
+      letter-spacing: -0.01em;
+    }
+    .chart-range { flex-direction: column; align-items: stretch; }
+    .range-btn { width: 100%; }
+    #altitudeM { max-width: none; }
+  }
+
+  /* ── TABLE ── */
+  .history-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem 1.4rem;
+    overflow-x: auto;
+  }
+  .history-title { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 1rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+  th { text-align:left; color:var(--muted); font-weight:400; padding:.3rem .8rem .6rem 0; border-bottom:1px solid var(--border); letter-spacing:.06em; }
+  td { padding:.42rem .8rem .42rem 0; border-bottom:1px solid #111d2a; color:#b0c8e8; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:#0f1e30; }
+  td.t { color:var(--accent-temp); }
+  td.h { color:var(--accent-hum); }
+  td.l { color:var(--accent-light); }
+  td.p { color:var(--accent-pres); }
+
+  .no-data { text-align:center; padding:2.5rem 1rem; color:var(--muted); font-size:.76rem; }
+  .no-data .icon { font-size:2rem; display:block; margin-bottom:.6rem; }
+
+  footer { margin-top:2rem; font-size:.62rem; color:var(--muted); letter-spacing:.05em; text-align:center; }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setupScreen">
+  <div class="setup-box">
+    <div class="setup-logo">WEATHER<span>STATION</span></div>
+    <div class="setup-sub">Connect to ThingSpeak</div>
+    <div class="field-group">
+      <label>Channel ID</label>
+      <input type="text" id="inputChannel" placeholder="e.g. 1234567" autocomplete="off"/>
+    </div>
+    <div class="field-group">
+      <label>Read API Key</label>
+      <input type="text" id="inputKey" placeholder="e.g. ABCDEFGHIJKLMNOP" autocomplete="off"/>
+    </div>
+    <button class="connect-btn" onclick="connect()">Connect →</button>
+    <div class="setup-error" id="setupError"></div>
+    <div class="setup-hint">
+      Find these at <a href="https://thingspeak.com/channels" target="_blank">thingspeak.com</a> → your channel → API Keys
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <span>FETCHING DATA…</span>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="container">
+
+    <header>
+      <div class="site-title">WEATHER<span>STATION</span></div>
+      <div class="header-right">
+        <div class="status-bar">
+          <div class="dot" id="statusDot"></div>
+          <span id="statusText">CONNECTING</span>
+          <span class="status-uptime" id="statusUptime"></span>
+        </div>
+        <div class="status-wifi-line" id="statusWifi">
+          <div class="wifi-top-icon" id="statusWifiBars"><span></span><span></span><span></span><span></span></div>
+          <span class="status-wifi-text" id="statusWifiText"></span>
+        </div>
+        <div class="channel-badge">Channel <span id="chLabel">—</span></div>
+        <a class="settings-btn" href="history.html">history</a>
+        <button class="settings-btn" onclick="resetSettings()">⚙ change channel</button>
+      </div>
+    </header>
+
+    <div class="big-cards">
+      <div class="big-card temp"  style="animation-delay:.04s">
+        <div class="card-icon">🌡️</div>
+        <div class="card-label">Temperature</div>
+        <div class="card-value" id="valTemp">—<span class="card-unit">°C</span></div>
+        <div class="card-sub"   id="subTemp">—</div>
+      </div>
+      <div class="big-card hum"   style="animation-delay:.10s">
+        <div class="card-icon">💧</div>
+        <div class="card-label">Humidity</div>
+        <div class="card-value" id="valHum">—<span class="card-unit">%</span></div>
+        <div class="card-sub"   id="subHum">—</div>
+      </div>
+      <div class="big-card light" style="animation-delay:.16s">
+        <div class="card-icon">☀️</div>
+        <div class="card-label">Light Intensity</div>
+        <div class="card-value" id="valLight">—<span class="card-unit">lux</span></div>
+        <div class="card-sub"   id="subLight">—</div>
+      </div>
+      <div class="big-card pres"  style="animation-delay:.22s">
+        <div class="card-icon">🔵</div>
+        <div class="card-label">Pressure</div>
+        <div class="card-value" id="valPres">—<span class="card-unit">hPa</span></div>
+        <div class="card-sub"   id="subPres">—</div>
+      </div>
+      <div class="big-card rain"  style="animation-delay:.28s">
+        <div class="card-icon">☔</div>
+        <div class="card-label">Rain / Wet</div>
+        <div class="card-value" id="valRain">-</div>
+        <div class="card-sub"   id="subRain">-</div>
+      </div>
+    </div>
+    <div class="graph-window">
+      <div class="graph-window-title">Graph Date Range</div>
+      <div class="graph-window-controls">
+        <div class="field">
+          <label>From</label>
+          <input id="gFrom" type="text" placeholder="Select date/time"/>
+        </div>
+        <div class="field">
+          <label>To</label>
+          <input id="gTo" type="text" placeholder="Select date/time"/>
+        </div>
+        <button class="graph-window-btn" id="applyGraphRangeBtn">apply range</button>
+        <button class="graph-window-btn" id="clearGraphRangeBtn">live mode</button>
+      </div>
+    </div>
+    <div class="charts">
+      <div class="chart-card">
+        <div class="chart-head">
+          <div class="chart-title">Temperature (°C)</div>
+        </div>
+        <canvas id="chartTemp" height="120"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <div class="chart-title">Humidity (%)</div>
+        </div>
+        <canvas id="chartHum" height="120"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <div class="chart-title">Light Intensity (lux)</div>
+        </div>
+        <canvas id="chartLight" height="120"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <div class="chart-title">Pressure (hPa)</div>
+          <div class="range-inputs">
+            <input id="altitudeM" type="number" step="any" placeholder="alt m" title="Altitude in meters"/>
+          </div>
+        </div>
+        <canvas id="chartPres" height="120"></canvas>
+      </div>
+    </div>
+    <div class="history-card">
+      <div class="history-title">Recent readings</div>
+      <div id="tableWrap"><div class="no-data"><span class="icon">📡</span>Loading…</div></div>
+    </div>
+
+    <footer>Data from ThingSpeak · auto-refreshes every 15 s</footer>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+let CHANNEL_ID = '', API_KEY = '';
+let SEA_LEVEL_ALT_M = 0;
+const RESULTS = 40;
+const RANGE_RESULTS = 8000;
+const RAIN_WET_THRESHOLD = 500; // Match Arduino code: sensorValue < 500 => wet
+
+// ── Persist across page reload ────────────────────────────────
+function saveSettings() {
+  try {
+    sessionStorage.setItem('ws_ch', CHANNEL_ID);
+    sessionStorage.setItem('ws_key', API_KEY);
+    sessionStorage.setItem('ws_alt', String(SEA_LEVEL_ALT_M));
+  } catch(e){}
+}
+function loadSettings() {
+  try {
+    CHANNEL_ID = sessionStorage.getItem('ws_ch')||'';
+    API_KEY = sessionStorage.getItem('ws_key')||'';
+    const a = parseFloat(sessionStorage.getItem('ws_alt') || '0');
+    SEA_LEVEL_ALT_M = isNaN(a) ? 0 : a;
+  } catch(e){}
+}
+
+// ── Charts ────────────────────────────────────────────────────
+Chart.defaults.color = '#5a7a99';
+Chart.defaults.font.family = 'IBM Plex Mono';
+function makeChart(id, color) {
+  return new Chart(document.getElementById(id), {
+    type: 'line',
+    data: { labels: [], datasets: [{ data: [],
+      borderColor: color, borderWidth: 2,
+      pointRadius: 2, pointBackgroundColor: color,
+      backgroundColor: color + '18', fill: 'start', tension: 0.4
+    }]},
+    options: {
+      animation: { duration: 250 },
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.y}` } } },
+      scales: {
+        x: { ticks: { color:'#5a7a99', font:{size:9}, maxTicksLimit:6 }, grid:{color:'#1e2d42'} },
+        y: {
+          ticks: { color:'#5a7a99', font:{size:9}, maxTicksLimit:5 },
+          grid:{color:'#1e2d42'},
+          grace: '8%'
+        }
+      }
+    }
+  });
+}
+
+let charts = {};
+function initCharts() {
+  charts.temp  = makeChart('chartTemp',  '#ff6b35');
+  charts.hum   = makeChart('chartHum',   '#00c9a7');
+  charts.light = makeChart('chartLight', '#ffd166');
+  charts.pres  = makeChart('chartPres',  '#7b9cff');
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+const fmt  = iso => new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+const fmtF = iso => new Date(iso).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+function setCard(vid, sid, raw, dec) {
+  const el   = document.getElementById(vid);
+  const unit = el.querySelector('.card-unit');
+  const val  = raw !== null && raw !== '' && !isNaN(parseFloat(raw)) ? parseFloat(raw).toFixed(dec) : '—';
+  el.childNodes[0].textContent = val;
+  if (unit) el.appendChild(unit);
+  document.getElementById(sid).textContent = 'latest reading';
+}
+
+function getRainWetValue(raw) {
+  if (raw === null || raw === undefined || raw === '') return '-';
+  const s = String(raw).trim().toLowerCase();
+
+  if (['yes', 'wet', 'rain', 'raining', 'true'].includes(s)) return 'YES';
+  if (['no', 'dry', 'false'].includes(s)) return 'NO';
+
+  const n = parseFloat(s);
+  if (!isNaN(n)) {
+    // Match Arduino logic: analogRead value below threshold means wet.
+    return n < RAIN_WET_THRESHOLD ? 'YES' : 'NO';
+  }
+
+  return '-';
+}
+
+function setRainCard(raw) {
+  document.getElementById('valRain').textContent = getRainWetValue(raw);
+  document.getElementById('subRain').textContent = 'latest reading';
+}
+
+function ensurePressureUnit() {
+  const el = document.getElementById('valPres');
+  if (!el) return;
+  let unit = el.querySelector('.card-unit');
+  if (!unit) {
+    unit = document.createElement('span');
+    unit.className = 'card-unit';
+    el.appendChild(unit);
+  }
+  unit.textContent = 'hPa';
+}
+
+function parseWifi(raw) {
+  const dbm = parseFloat(raw);
+  if (isNaN(dbm)) return { dbm: null, bars: 0, label: 'No data' };
+  if (dbm >= -50) return { dbm, bars: 4, label: 'Excellent' };
+  if (dbm >= -70) return { dbm, bars: 3, label: 'Good' };
+  if (dbm >= -80) return { dbm, bars: 2, label: 'Fair' };
+  return { dbm, bars: 1, label: 'Weak' };
+}
+
+function setWifiStatus(raw) {
+  const w = parseWifi(raw);
+  const el = document.getElementById('statusWifi');
+  const txt = document.getElementById('statusWifiText');
+  const bars = document.querySelectorAll('#statusWifiBars span');
+  el.classList.remove('wifi-excellent', 'wifi-good', 'wifi-fair', 'wifi-weak');
+  if (w.dbm === null) {
+    txt.textContent = '';
+    bars.forEach(b => b.classList.remove('on'));
+    return;
+  }
+  bars.forEach((b, i) => b.classList.toggle('on', i < w.bars));
+  const levelClass = w.bars >= 4 ? 'wifi-excellent' : w.bars === 3 ? 'wifi-good' : w.bars === 2 ? 'wifi-fair' : 'wifi-weak';
+  el.classList.add(levelClass);
+  txt.textContent = w.label;
+}
+
+function parseUptimeSeconds(raw) {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = parseInt(String(raw).trim(), 10);
+  return isNaN(n) ? null : n;
+}
+
+function formatUptime(totalSec) {
+  if (totalSec === null) return '-';
+  const pad2 = n => String(n).padStart(2, '0');
+  if (totalSec < 86400) {
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    return `${pad2(h)}:${pad2(m)}`;
+  }
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  return `${pad2(d)}:${pad2(h)}`;
+}
+
+
+function localInputToIso(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function getGraphDateRange() {
+  const from = localInputToIso(document.getElementById('gFrom').value);
+  const to = localInputToIso(document.getElementById('gTo').value);
+  if (from && to && new Date(from) > new Date(to)) return { error: true };
+  return { from, to, hasRange: !!(from || to), error: false };
+}
+
+function readAltitude() {
+  const n = parseFloat(document.getElementById('altitudeM').value);
+  SEA_LEVEL_ALT_M = isNaN(n) ? 0 : n;
+  saveSettings();
+}
+
+function toSeaLevelPressure(raw) {
+  const p = parseFloat(raw);
+  if (isNaN(p)) return null;
+  if (!SEA_LEVEL_ALT_M) return p;
+  const base = 1 - (SEA_LEVEL_ALT_M / 44330);
+  if (base <= 0) return p;
+  return p / Math.pow(base, 5.255);
+}
+
+function updatePollingMode() {
+  clearInterval(pollTimer);
+  if (!getGraphDateRange().hasRange) pollTimer = setInterval(refresh, 15000);
+}
+
+// ── ThingSpeak ────────────────────────────────────────────────
+async function fetchTS() {
+  const range = getGraphDateRange();
+  if (range.error) throw new Error('INVALID_RANGE');
+  const params = [`api_key=${API_KEY}`];
+  if (range.hasRange) {
+    params.push(`results=${RANGE_RESULTS}`);
+    if (range.from) params.push(`start=${encodeURIComponent(range.from)}`);
+    if (range.to) params.push(`end=${encodeURIComponent(range.to)}`);
+  } else {
+    params.push(`results=${RESULTS}`);
+  }
+  const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?${params.join('&')}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const j = await res.json();
+  if (!j.feeds) throw new Error('Bad response');
+  return j;
+}
+
+// ── Render ────────────────────────────────────────────────────
+async function refresh() {
+  try {
+    const { feeds } = await fetchTS();
+    if (!feeds.length) return;
+
+    const latest = feeds[feeds.length - 1];
+    const age    = (Date.now() - new Date(latest.created_at)) / 1000;
+    const dot    = document.getElementById('statusDot');
+    const stx    = document.getElementById('statusText');
+    const range = getGraphDateRange();
+    dot.className = 'dot ' + (range.hasRange ? 'stale' : (age < 120 ? 'live' : 'stale'));
+    stx.textContent = range.hasRange ? 'RANGE MODE' : (age < 120 ? 'LIVE' : `LAST: ${Math.round(age)}s AGO`);
+    const upSecStatus = parseUptimeSeconds(latest.field7);
+    document.getElementById('statusUptime').textContent = upSecStatus === null ? '' : `UP ${formatUptime(upSecStatus)}`;
+
+    setCard('valTemp',  'subTemp',  latest.field1, 1);
+    setCard('valHum',   'subHum',   latest.field2, 1);
+    setCard('valLight', 'subLight', latest.field3, 0);
+    const presAdjusted = toSeaLevelPressure(latest.field4);
+    setCard('valPres',  'subPres',  presAdjusted, 1);
+    ensurePressureUnit();
+    document.getElementById('subPres').textContent = SEA_LEVEL_ALT_M ? `sea-level @ ${SEA_LEVEL_ALT_M.toFixed(0)} m · hPa` : 'latest reading · hPa';
+    setRainCard(latest.field5);
+    setWifiStatus(latest.field6);
+
+    const labels = feeds.map(f => fmt(f.created_at));
+    const num = (f, k) => { const v = parseFloat(f[k]); return isNaN(v) ? null : v; };
+    const setCD = (ch, key) => { ch.data.labels = labels; ch.data.datasets[0].data = feeds.map(f => num(f,key)); ch.update(); };
+    setCD(charts.temp,  'field1');
+    setCD(charts.hum,   'field2');
+    setCD(charts.light, 'field3');
+    charts.pres.data.labels = labels;
+    charts.pres.data.datasets[0].data = feeds.map(f => toSeaLevelPressure(f.field4));
+    charts.pres.update();
+
+    const rows = [...feeds].reverse().slice(0, 15);
+    document.getElementById('tableWrap').innerHTML = `
+      <table>
+        <thead><tr><th>TIME</th><th>TEMP (°C)</th><th>HUM (%)</th><th>LIGHT (lux)</th><th>PRESSURE (hPa)</th></tr></thead>
+        <tbody>${rows.map(f => `<tr>
+          <td>${fmtF(f.created_at)}</td>
+          <td class="t">${f.field1 && !isNaN(+f.field1) ? (+f.field1).toFixed(1) : '—'}</td>
+          <td class="h">${f.field2 && !isNaN(+f.field2) ? (+f.field2).toFixed(1) : '—'}</td>
+          <td class="l">${f.field3 && !isNaN(+f.field3) ? (+f.field3).toFixed(0) : '—'}</td>
+          <td class="p">${toSeaLevelPressure(f.field4) !== null ? toSeaLevelPressure(f.field4).toFixed(1) : '—'}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+
+  } catch(e) {
+    document.getElementById('statusDot').className = 'dot stale';
+    document.getElementById('statusText').textContent = e.message === 'INVALID_RANGE' ? 'BAD RANGE' : 'FETCH ERROR';
+    document.getElementById('statusUptime').textContent = '';
+    document.getElementById('statusWifi').classList.remove('wifi-excellent', 'wifi-good', 'wifi-fair', 'wifi-weak');
+    document.getElementById('statusWifiText').textContent = '';
+    document.querySelectorAll('#statusWifiBars span').forEach(b => b.classList.remove('on'));
+    console.error(e);
+  }
+}
+
+let pollTimer = null;
+
+async function connect() {
+  const ch  = document.getElementById('inputChannel').value.trim();
+  const key = document.getElementById('inputKey').value.trim();
+  const err = document.getElementById('setupError');
+  if (!ch || !key) { err.textContent = 'Please fill in both fields.'; return; }
+  readAltitude();
+  CHANNEL_ID = ch; API_KEY = key; err.textContent = '';
+
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('loadingOverlay').style.display = 'flex';
+
+  try {
+    await fetchTS();
+    saveSettings();
+    document.getElementById('loadingOverlay').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('chLabel').textContent = CHANNEL_ID;
+    initCharts();
+    await refresh();
+    updatePollingMode();
+  } catch(e) {
+    document.getElementById('loadingOverlay').style.display = 'none';
+    document.getElementById('setupScreen').style.display = 'flex';
+    CHANNEL_ID = ''; API_KEY = '';
+    err.textContent = 'Connection failed — check your Channel ID and API Key.';
+  }
+}
+
+function resetSettings() {
+  clearInterval(pollTimer);
+  try { sessionStorage.clear(); } catch(e){}
+  CHANNEL_ID = ''; API_KEY = '';
+  SEA_LEVEL_ALT_M = 0;
+  document.getElementById('altitudeM').value = '';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('setupScreen').style.display = 'flex';
+}
+
+['inputChannel','inputKey'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', e => { if (e.key==='Enter') connect(); })
+);
+document.getElementById('applyGraphRangeBtn').addEventListener('click', async () => {
+  readAltitude();
+  updatePollingMode();
+  await refresh();
+});
+document.getElementById('clearGraphRangeBtn').addEventListener('click', async () => {
+  document.getElementById('gFrom').value = '';
+  document.getElementById('gTo').value = '';
+  readAltitude();
+  updatePollingMode();
+  await refresh();
+});
+['gFrom','gTo'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', async e => {
+    if (e.key === 'Enter') {
+      readAltitude();
+      updatePollingMode();
+      await refresh();
+    }
+  })
+);
+document.getElementById('altitudeM').addEventListener('keydown', async e => {
+  if (e.key === 'Enter') {
+    readAltitude();
+    await refresh();
+  }
+});
+document.getElementById('altitudeM').addEventListener('change', async () => {
+  readAltitude();
+  await refresh();
+});
+
+// Auto-connect if cached
+loadSettings();
+document.getElementById('altitudeM').value = SEA_LEVEL_ALT_M ? String(SEA_LEVEL_ALT_M) : '';
+flatpickr('#gFrom', {
+  enableTime: true,
+  time_24hr: true,
+  dateFormat: 'Y-m-d\\TH:i',
+  minuteIncrement: 1
+});
+flatpickr('#gTo', {
+  enableTime: true,
+  time_24hr: true,
+  dateFormat: 'Y-m-d\\TH:i',
+  minuteIncrement: 1
+});
+if (CHANNEL_ID && API_KEY) {
+  document.getElementById('inputChannel').value = CHANNEL_ID;
+  document.getElementById('inputKey').value = API_KEY;
+  connect();
+}
+</script>
+</body>
+</html>
+

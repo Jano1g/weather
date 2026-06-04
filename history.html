@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Weather Station History</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;800&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0f1a;
+    --surface: #0f1824;
+    --card: #131d2e;
+    --border: #1e2d42;
+    --text: #e8f0fe;
+    --muted: #5a7a99;
+    --grid: rgba(30,45,66,0.5);
+    --accent-temp: #ff6b35;
+    --accent-hum: #00c9a7;
+    --accent-light: #ffd166;
+    --accent-pres: #7b9cff;
+    --accent-rain: #4dd0e1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1220px;
+    margin: 0 auto;
+    padding: 1.6rem 1.2rem 2.2rem;
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    font-size: clamp(1.2rem, 3.2vw, 2rem);
+    line-height: 1;
+  }
+  .title span { color: var(--accent-temp); }
+  .nav a {
+    color: var(--muted);
+    text-decoration: none;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .nav a:hover { color: var(--accent-hum); border-color: var(--accent-hum); }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 0.9rem;
+  }
+  .controls {
+    display: grid;
+    grid-template-columns: 1.1fr 1.4fr 0.7fr 1fr 1fr auto auto;
+    gap: 0.7rem;
+    align-items: end;
+  }
+  .field label {
+    display: block;
+    color: var(--muted);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+  .field input, .field select {
+    width: 100%;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.56rem 0.68rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+  }
+  .btn {
+    background: var(--accent-hum);
+    color: #02181b;
+    border: none;
+    border-radius: 8px;
+    padding: 0.62rem 0.8rem;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    font-size: 0.77rem;
+    min-width: 120px;
+  }
+  .preset-row {
+    display: flex;
+    gap: 0.45rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .preset-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 7px;
+    padding: 0.34rem 0.56rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+  }
+  .preset-btn:hover { border-color: var(--accent-hum); color: var(--accent-hum); }
+  .meta {
+    color: var(--muted);
+    font-size: 0.68rem;
+    margin-top: 0.7rem;
+    min-height: 1em;
+  }
+  .section-title {
+    color: var(--muted);
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.7rem;
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.7rem;
+  }
+  .split-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+  }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.7rem;
+  }
+  .summary-card h4 {
+    font-size: 0.7rem;
+    margin-bottom: 0.45rem;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .summary-line {
+    font-size: 0.66rem;
+    color: #b0c8e8;
+    margin-top: 0.24rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .trend-up { color: #00e676; }
+  .trend-down { color: #ff6b35; }
+  .trend-flat { color: var(--muted); }
+  .split-note {
+    margin-top: 0.55rem;
+    color: var(--muted);
+    font-size: 0.62rem;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: 10px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.74rem;
+    min-width: 940px;
+  }
+  th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    padding: 0.42rem 0.8rem 0.62rem 0;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 0.48rem 0.8rem 0.48rem 0;
+    border-bottom: 1px solid #111d2a;
+    color: #b0c8e8;
+    white-space: nowrap;
+  }
+  tr:hover td { background: #0f1e30; }
+  td.t { color: var(--accent-temp); }
+  td.h { color: var(--accent-hum); }
+  td.l { color: var(--accent-light); }
+  td.p { color: var(--accent-pres); }
+  td.r { color: var(--accent-rain); font-weight: 700; }
+  .pager {
+    margin-top: 0.8rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .pager-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .pager-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 7px;
+    padding: 0.3rem 0.55rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+  }
+  .pager-btn:disabled { opacity: 0.4; cursor: default; }
+  .pager-info { font-size: 0.66rem; color: var(--muted); }
+  .pager select {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 0.3rem 0.4rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.64rem;
+  }
+  @media(max-width: 980px) {
+    .controls { grid-template-columns: 1fr 1fr; }
+    .summary-grid { grid-template-columns: 1fr; }
+    .split-grid { grid-template-columns: 1fr; }
+  }
+  @media(max-width: 580px) {
+    .controls { grid-template-columns: 1fr; }
+    .btn { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top">
+    <div class="title">WEATHER<span>STATION</span> HISTORY</div>
+    <div class="nav"><a href="weather-station.html">back to dashboard</a></div>
+  </div>
+
+  <div class="panel">
+    <div class="controls">
+      <div class="field">
+        <label>Channel ID</label>
+        <input id="inputChannel" type="text" autocomplete="off" placeholder="e.g. 1234567"/>
+      </div>
+      <div class="field">
+        <label>Read API Key</label>
+        <input id="inputKey" type="text" autocomplete="off" placeholder="ThingSpeak Read API Key"/>
+      </div>
+      <div class="field">
+        <label>Rows</label>
+        <select id="inputRows">
+          <option value="200">200</option>
+          <option value="500">500</option>
+          <option value="2000" selected>2000</option>
+          <option value="8000">8000</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>From</label>
+        <input id="inputFrom" type="datetime-local"/>
+      </div>
+      <div class="field">
+        <label>To</label>
+        <input id="inputTo" type="datetime-local"/>
+      </div>
+      <button class="btn" id="btnLoad">Load History</button>
+      <button class="btn" id="btnApply" style="background:#7b9cff;color:#0a0f1a;">Apply Range</button>
+    </div>
+    <div class="preset-row">
+      <button class="preset-btn" data-preset="24h">Last 24h</button>
+      <button class="preset-btn" data-preset="7d">Last 7d</button>
+      <button class="preset-btn" data-preset="30d">Last 30d</button>
+      <button class="preset-btn" data-preset="all">All Loaded</button>
+    </div>
+    <div class="meta" id="meta">Ready.</div>
+  </div>
+
+  <div class="panel">
+    <div class="section-title">Summaries (Min / Avg / Max + Trend)</div>
+    <div id="summaryWrap" class="summary-grid">
+      <div class="summary-card"><h4>Daily</h4><div class="summary-line"><span>No data yet.</span></div></div>
+      <div class="summary-card"><h4>Weekly</h4><div class="summary-line"><span>No data yet.</span></div></div>
+      <div class="summary-card"><h4>Monthly</h4><div class="summary-line"><span>No data yet.</span></div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="section-title">Day vs Night Split (Filtered Range)</div>
+    <div id="dayNightWrap" class="split-grid">
+      <div class="summary-card"><h4>Daytime (06:00-17:59)</h4><div class="summary-line"><span>No data yet.</span></div></div>
+      <div class="summary-card"><h4>Nighttime (18:00-05:59)</h4><div class="summary-line"><span>No data yet.</span></div></div>
+    </div>
+    <div class="split-note" id="dayNightNote">Load data to calculate day/night averages.</div>
+  </div>
+
+  <div class="panel">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>TIME</th>
+            <th>TEMP (°C)</th>
+            <th>HUM (%)</th>
+            <th>LIGHT (lux)</th>
+            <th>PRESSURE (hPa)</th>
+            <th>RAIN / WET</th>
+            <th>RAIN RAW</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="7" style="color:#5a7a99;padding:1rem 0;">No data loaded yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <div class="pager-controls">
+        <button class="pager-btn" id="btnPrev">Prev</button>
+        <button class="pager-btn" id="btnNext">Next</button>
+      </div>
+      <div class="pager-info" id="pagerInfo">Page 1 / 1</div>
+      <div class="pager-controls">
+        <span class="pager-info">Rows/Page</span>
+        <select id="pageSize">
+          <option value="15">15</option>
+          <option value="25" selected>25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const RAIN_WET_THRESHOLD = 500; // Match Arduino code: sensorValue < 500 => wet
+let allFeeds = [];
+let filteredFeeds = [];
+let currentPage = 1;
+let totalLoadedCount = 0;
+
+function loadSaved() {
+  try {
+    document.getElementById('inputChannel').value = sessionStorage.getItem('ws_ch') || '';
+    document.getElementById('inputKey').value = sessionStorage.getItem('ws_key') || '';
+  } catch(e) {}
+}
+
+function saveCurrent(ch, key) {
+  try {
+    sessionStorage.setItem('ws_ch', ch);
+    sessionStorage.setItem('ws_key', key);
+  } catch(e) {}
+}
+
+function fmtTime(iso) {
+  return new Date(iso).toLocaleString([], {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+}
+
+function num(v, dec) {
+  if (v === null || v === undefined || v === '') return '-';
+  const n = parseFloat(v);
+  return isNaN(n) ? '-' : n.toFixed(dec);
+}
+
+function rainYN(raw) {
+  if (raw === null || raw === undefined || raw === '') return '-';
+  const s = String(raw).trim().toLowerCase();
+  if (['yes', 'wet', 'rain', 'raining', 'true'].includes(s)) return 'YES';
+  if (['no', 'dry', 'false'].includes(s)) return 'NO';
+  const n = parseFloat(s);
+  if (!isNaN(n)) return n < RAIN_WET_THRESHOLD ? 'YES' : 'NO';
+  return '-';
+}
+
+function numVal(v) {
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+
+function parseLocalDateTime(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function toLocalInputValue(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function applyDefault24hRangeIfEmpty() {
+  const fromInput = document.getElementById('inputFrom');
+  const toInput = document.getElementById('inputTo');
+  if (fromInput.value || toInput.value) return;
+  const now = new Date();
+  const from = new Date(now);
+  from.setHours(from.getHours() - 24);
+  fromInput.value = toLocalInputValue(from.toISOString());
+  toInput.value = toLocalInputValue(now.toISOString());
+}
+
+function getRangeFilteredFeeds(feeds) {
+  const from = parseLocalDateTime(document.getElementById('inputFrom').value);
+  const to = parseLocalDateTime(document.getElementById('inputTo').value);
+
+  if (from && to && from > to) return { error: 'The "From" date must be earlier than "To".' };
+
+  const filtered = feeds.filter(f => {
+    const t = new Date(f.created_at);
+    if (isNaN(t.getTime())) return false;
+    if (from && t < from) return false;
+    if (to && t > to) return false;
+    return true;
+  });
+
+  return { filtered, from, to };
+}
+
+function trendLabel(first, last) {
+  if (first === null || last === null) return '<span class="trend-flat">→</span>';
+  if (last > first) return '<span class="trend-up">↑</span>';
+  if (last < first) return '<span class="trend-down">↓</span>';
+  return '<span class="trend-flat">→</span>';
+}
+
+function metricStats(feeds, key) {
+  const vals = feeds.map(f => numVal(f[key])).filter(v => v !== null);
+  if (!vals.length) return null;
+  return {
+    min: Math.min(...vals),
+    max: Math.max(...vals),
+    avg: vals.reduce((a, b) => a + b, 0) / vals.length,
+    first: vals[0],
+    last: vals[vals.length - 1]
+  };
+}
+
+function statText(stats, dec) {
+  if (!stats) return 'n/a';
+  return `${stats.min.toFixed(dec)} / ${stats.avg.toFixed(dec)} / ${stats.max.toFixed(dec)}`;
+}
+
+function renderSummaryCard(title, feeds) {
+  if (!feeds.length) {
+    return `<div class="summary-card"><h4>${title}</h4><div class="summary-line"><span>No data in range.</span></div></div>`;
+  }
+
+  const t = metricStats(feeds, 'field1');
+  const h = metricStats(feeds, 'field2');
+  const l = metricStats(feeds, 'field3');
+  const p = metricStats(feeds, 'field4');
+
+  return `
+    <div class="summary-card">
+      <h4>${title}</h4>
+      <div class="summary-line"><span>TEMP</span><span>${statText(t, 1)} ${trendLabel(t?.first ?? null, t?.last ?? null)}</span></div>
+      <div class="summary-line"><span>HUM</span><span>${statText(h, 1)} ${trendLabel(h?.first ?? null, h?.last ?? null)}</span></div>
+      <div class="summary-line"><span>LIGHT</span><span>${statText(l, 0)} ${trendLabel(l?.first ?? null, l?.last ?? null)}</span></div>
+      <div class="summary-line"><span>PRESS</span><span>${statText(p, 1)} ${trendLabel(p?.first ?? null, p?.last ?? null)}</span></div>
+    </div>
+  `;
+}
+
+function avgVal(feeds, key) {
+  const vals = feeds.map(f => numVal(f[key])).filter(v => v !== null);
+  if (!vals.length) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function avgText(v, dec) {
+  return v === null ? 'n/a' : v.toFixed(dec);
+}
+
+function renderDayNight(feeds) {
+  const dayFeeds = feeds.filter(f => {
+    const h = new Date(f.created_at).getHours();
+    return h >= 6 && h < 18;
+  });
+  const nightFeeds = feeds.filter(f => {
+    const h = new Date(f.created_at).getHours();
+    return h < 6 || h >= 18;
+  });
+
+  const dayTemp = avgVal(dayFeeds, 'field1');
+  const nightTemp = avgVal(nightFeeds, 'field1');
+  const dayHum = avgVal(dayFeeds, 'field2');
+  const nightHum = avgVal(nightFeeds, 'field2');
+  const dayLight = avgVal(dayFeeds, 'field3');
+  const nightLight = avgVal(nightFeeds, 'field3');
+  const dayPres = avgVal(dayFeeds, 'field4');
+  const nightPres = avgVal(nightFeeds, 'field4');
+
+  const wrap = document.getElementById('dayNightWrap');
+  wrap.innerHTML = `
+    <div class="summary-card">
+      <h4>Daytime (06:00-17:59)</h4>
+      <div class="summary-line"><span>Temp Avg</span><span>${avgText(dayTemp, 1)} °C</span></div>
+      <div class="summary-line"><span>Hum Avg</span><span>${avgText(dayHum, 1)} %</span></div>
+      <div class="summary-line"><span>Light Avg</span><span>${avgText(dayLight, 0)} lux</span></div>
+      <div class="summary-line"><span>Pressure Avg</span><span>${avgText(dayPres, 1)} hPa</span></div>
+      <div class="summary-line"><span>Samples</span><span>${dayFeeds.length}</span></div>
+    </div>
+    <div class="summary-card">
+      <h4>Nighttime (18:00-05:59)</h4>
+      <div class="summary-line"><span>Temp Avg</span><span>${avgText(nightTemp, 1)} °C</span></div>
+      <div class="summary-line"><span>Hum Avg</span><span>${avgText(nightHum, 1)} %</span></div>
+      <div class="summary-line"><span>Light Avg</span><span>${avgText(nightLight, 0)} lux</span></div>
+      <div class="summary-line"><span>Pressure Avg</span><span>${avgText(nightPres, 1)} hPa</span></div>
+      <div class="summary-line"><span>Samples</span><span>${nightFeeds.length}</span></div>
+    </div>
+  `;
+
+  const note = document.getElementById('dayNightNote');
+  if (dayTemp === null || nightTemp === null) {
+    note.textContent = 'Need both day and night samples in the selected range to compare temperature.';
+    return;
+  }
+  const delta = dayTemp - nightTemp;
+  const sign = delta > 0 ? '+' : '';
+  note.textContent = `Temperature difference: Day - Night = ${sign}${delta.toFixed(1)} °C.`;
+}
+
+function renderSummaries(feeds) {
+  const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+  const weekFeeds = feeds.filter(f => new Date(f.created_at).getTime() >= now - 7 * DAY);
+  const dayFeeds = feeds.filter(f => new Date(f.created_at).getTime() >= now - DAY);
+  const monthFeeds = feeds.filter(f => new Date(f.created_at).getTime() >= now - 30 * DAY);
+  document.getElementById('summaryWrap').innerHTML = [
+    renderSummaryCard('Daily', dayFeeds),
+    renderSummaryCard('Weekly', weekFeeds),
+    renderSummaryCard('Monthly', monthFeeds)
+  ].join('');
+  renderDayNight(feeds);
+}
+
+function renderPage(totalLoaded) {
+  const meta = document.getElementById('meta');
+  const tbody = document.getElementById('tbody');
+  const pageSize = parseInt(document.getElementById('pageSize').value, 10) || 25;
+  const totalPages = Math.max(1, Math.ceil(filteredFeeds.length / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+
+  if (!filteredFeeds.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:#5a7a99;padding:1rem 0;">No rows in selected date range.</td></tr>';
+    meta.textContent = `Loaded ${totalLoaded} rows, showing 0 after date filter. Rain logic: raw < ${RAIN_WET_THRESHOLD} = YES (wet).`;
+    document.getElementById('pagerInfo').textContent = 'Page 1 / 1';
+    document.getElementById('btnPrev').disabled = true;
+    document.getElementById('btnNext').disabled = true;
+    return;
+  }
+
+  const start = (currentPage - 1) * pageSize;
+  const end = start + pageSize;
+  const pageRows = filteredFeeds.slice(start, end);
+
+  const out = pageRows.map(f => `
+    <tr>
+      <td>${fmtTime(f.created_at)}</td>
+      <td class="t">${num(f.field1, 1)}</td>
+      <td class="h">${num(f.field2, 1)}</td>
+      <td class="l">${num(f.field3, 0)}</td>
+      <td class="p">${num(f.field4, 1)}</td>
+      <td class="r">${rainYN(f.field5)}</td>
+      <td>${f.field5 === null || f.field5 === undefined || f.field5 === '' ? '-' : f.field5}</td>
+    </tr>
+  `).join('');
+
+  tbody.innerHTML = out;
+  meta.textContent = `Loaded ${totalLoaded} rows, showing ${filteredFeeds.length} after date filter. Rain logic: raw < ${RAIN_WET_THRESHOLD} = YES (wet).`;
+  document.getElementById('pagerInfo').textContent = `Page ${currentPage} / ${totalPages}`;
+  document.getElementById('btnPrev').disabled = currentPage <= 1;
+  document.getElementById('btnNext').disabled = currentPage >= totalPages;
+}
+
+function renderRows(feeds, totalLoaded, resetPage = true) {
+  const meta = document.getElementById('meta');
+  const result = getRangeFilteredFeeds(feeds);
+
+  if (result.error) {
+    meta.textContent = result.error;
+    return;
+  }
+
+  filteredFeeds = result.filtered.slice().reverse();
+  totalLoadedCount = totalLoaded;
+  if (resetPage) currentPage = 1;
+  renderSummaries(result.filtered);
+  renderPage(totalLoaded);
+}
+
+function setPresetRange(kind) {
+  const fromInput = document.getElementById('inputFrom');
+  const toInput = document.getElementById('inputTo');
+  if (kind === 'all') {
+    fromInput.value = '';
+    toInput.value = '';
+  } else {
+    const now = new Date();
+    const from = new Date(now);
+    if (kind === '24h') from.setHours(from.getHours() - 24);
+    if (kind === '7d') from.setDate(from.getDate() - 7);
+    if (kind === '30d') from.setDate(from.getDate() - 30);
+    fromInput.value = toLocalInputValue(from.toISOString());
+    toInput.value = toLocalInputValue(now.toISOString());
+  }
+  if (allFeeds.length) renderRows(allFeeds, totalLoadedCount, true);
+}
+
+async function loadHistory() {
+  const ch = document.getElementById('inputChannel').value.trim();
+  const key = document.getElementById('inputKey').value.trim();
+  const rows = parseInt(document.getElementById('inputRows').value, 10) || 500;
+  const meta = document.getElementById('meta');
+  const tbody = document.getElementById('tbody');
+
+  if (!ch || !key) {
+    meta.textContent = 'Please enter Channel ID and Read API Key.';
+    return;
+  }
+
+  saveCurrent(ch, key);
+  meta.textContent = 'Loading...';
+  tbody.innerHTML = '<tr><td colspan="7" style="color:#5a7a99;padding:1rem 0;">Loading data...</td></tr>';
+
+  try {
+    const url = `https://api.thingspeak.com/channels/${ch}/feeds.json?api_key=${key}&results=${rows}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const feeds = data.feeds || [];
+    allFeeds = feeds;
+
+    if (!feeds.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="color:#5a7a99;padding:1rem 0;">No historical data found.</td></tr>';
+      meta.textContent = 'Loaded 0 rows.';
+      return;
+    }
+
+    applyDefault24hRangeIfEmpty();
+
+    renderRows(feeds, feeds.length);
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:#ff6b35;padding:1rem 0;">Failed to load history.</td></tr>';
+    meta.textContent = 'Fetch error. Check Channel ID / API key and try again.';
+  }
+}
+
+document.getElementById('btnLoad').addEventListener('click', loadHistory);
+document.getElementById('btnApply').addEventListener('click', () => {
+  if (!allFeeds.length) return;
+  renderRows(allFeeds, allFeeds.length);
+});
+document.querySelectorAll('.preset-btn').forEach(btn =>
+  btn.addEventListener('click', () => setPresetRange(btn.dataset.preset))
+);
+document.getElementById('btnPrev').addEventListener('click', () => {
+  if (currentPage > 1) {
+    currentPage -= 1;
+    renderPage(totalLoadedCount);
+  }
+});
+document.getElementById('btnNext').addEventListener('click', () => {
+  const pageSize = parseInt(document.getElementById('pageSize').value, 10) || 25;
+  const totalPages = Math.max(1, Math.ceil(filteredFeeds.length / pageSize));
+  if (currentPage < totalPages) {
+    currentPage += 1;
+    renderPage(totalLoadedCount);
+  }
+});
+document.getElementById('pageSize').addEventListener('change', () => {
+  currentPage = 1;
+  renderPage(totalLoadedCount);
+});
+['inputChannel','inputKey'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') loadHistory(); })
+);
+
+loadSaved();
+if (document.getElementById('inputChannel').value && document.getElementById('inputKey').value) {
+  loadHistory();
+}
+</script>
+</body>
+</html>
