@@ -268,7 +268,7 @@
 <div class="container">
   <div class="top">
     <div class="title">WEATHER<span>STATION</span> HISTORY</div>
-    <div class="nav"><a href="weather-station.html">back to dashboard</a></div>
+    <div class="nav"><a href="index.html">back to dashboard</a></div>
   </div>
 
   <div class="panel">
@@ -375,15 +375,15 @@ let totalLoadedCount = 0;
 
 function loadSaved() {
   try {
-    document.getElementById('inputChannel').value = sessionStorage.getItem('ws_ch') || '';
-    document.getElementById('inputKey').value = sessionStorage.getItem('ws_key') || '';
+    document.getElementById('inputChannel').value = localStorage.getItem('ws_ch') || sessionStorage.getItem('ws_ch') || '';
+    document.getElementById('inputKey').value = localStorage.getItem('ws_key') || sessionStorage.getItem('ws_key') || '';
   } catch(e) {}
 }
 
 function saveCurrent(ch, key) {
   try {
-    sessionStorage.setItem('ws_ch', ch);
-    sessionStorage.setItem('ws_key', key);
+    localStorage.setItem('ws_ch', ch);
+    localStorage.setItem('ws_key', key);
   } catch(e) {}
 }
 

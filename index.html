@@ -308,7 +308,13 @@
     flex-wrap: wrap;
   }
   .big-card.pres .card-unit { font-size: 0.66rem; }
-  .big-card.rain .card-value { justify-content: flex-start; }
+  .big-card.rain .card-value {
+    justify-content: flex-start;
+    font-size: clamp(1.55rem, 2.7vw, 2.05rem);
+    letter-spacing: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .big-card.up .card-value { font-size: clamp(1.05rem, 2.2vw, 1.45rem); letter-spacing: -0.01em; }
   .big-card.wifi .card-value { font-size: clamp(1.2rem, 2.5vw, 1.7rem); }
 
@@ -498,6 +504,7 @@
     .big-card { min-height: 132px; padding: 0.9rem 0.95rem; }
     .card-value { font-size: clamp(1.45rem, 8vw, 2rem); }
     .big-card.pres .card-value { font-size: clamp(1.05rem, 6vw, 1.35rem); }
+    .big-card.rain .card-value { font-size: clamp(1.35rem, 7vw, 1.75rem); }
 
     .graph-window { padding: 0.7rem 0.75rem; }
     .graph-window-title { margin-bottom: 0.45rem; }
@@ -698,21 +705,21 @@ let CHANNEL_ID = '', API_KEY = '';
 let SEA_LEVEL_ALT_M = 0;
 const RESULTS = 40;
 const RANGE_RESULTS = 8000;
-const RAIN_WET_THRESHOLD = 500; // Match Arduino code: sensorValue < 500 => wet
+const RAIN_WET_THRESHOLD = 2000; // Analog rain sensor: below this means raining; dry is around 4095.
 
 // ── Persist across page reload ────────────────────────────────
 function saveSettings() {
   try {
-    sessionStorage.setItem('ws_ch', CHANNEL_ID);
-    sessionStorage.setItem('ws_key', API_KEY);
-    sessionStorage.setItem('ws_alt', String(SEA_LEVEL_ALT_M));
+    localStorage.setItem('ws_ch', CHANNEL_ID);
+    localStorage.setItem('ws_key', API_KEY);
+    localStorage.setItem('ws_alt', String(SEA_LEVEL_ALT_M));
   } catch(e){}
 }
 function loadSettings() {
   try {
-    CHANNEL_ID = sessionStorage.getItem('ws_ch')||'';
-    API_KEY = sessionStorage.getItem('ws_key')||'';
-    const a = parseFloat(sessionStorage.getItem('ws_alt') || '0');
+    CHANNEL_ID = localStorage.getItem('ws_ch') || sessionStorage.getItem('ws_ch') || '';
+    API_KEY = localStorage.getItem('ws_key') || sessionStorage.getItem('ws_key') || '';
+    const a = parseFloat(localStorage.getItem('ws_alt') || sessionStorage.getItem('ws_alt') || '0');
     SEA_LEVEL_ALT_M = isNaN(a) ? 0 : a;
   } catch(e){}
 }
@@ -769,13 +776,12 @@ function getRainWetValue(raw) {
   if (raw === null || raw === undefined || raw === '') return '-';
   const s = String(raw).trim().toLowerCase();
 
-  if (['yes', 'wet', 'rain', 'raining', 'true'].includes(s)) return 'YES';
-  if (['no', 'dry', 'false'].includes(s)) return 'NO';
+  if (['yes', 'wet', 'rain', 'raining', 'true'].includes(s)) return 'RAIN';
+  if (['no', 'dry', 'false'].includes(s)) return 'DRY';
 
   const n = parseFloat(s);
   if (!isNaN(n)) {
-    // Match Arduino logic: analogRead value below threshold means wet.
-    return n < RAIN_WET_THRESHOLD ? 'YES' : 'NO';
+    return n < RAIN_WET_THRESHOLD ? 'RAIN' : 'DRY';
   }
 
   return '-';
@@ -989,7 +995,14 @@ async function connect() {
 
 function resetSettings() {
   clearInterval(pollTimer);
-  try { sessionStorage.clear(); } catch(e){}
+  try {
+    localStorage.removeItem('ws_ch');
+    localStorage.removeItem('ws_key');
+    localStorage.removeItem('ws_alt');
+    sessionStorage.removeItem('ws_ch');
+    sessionStorage.removeItem('ws_key');
+    sessionStorage.removeItem('ws_alt');
+  } catch(e){}
   CHANNEL_ID = ''; API_KEY = '';
   SEA_LEVEL_ALT_M = 0;
   document.getElementById('altitudeM').value = '';
