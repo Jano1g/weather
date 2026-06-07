@@ -275,11 +275,13 @@
     <div class="controls">
       <div class="field">
         <label>Channel ID</label>
-        <input id="inputChannel" type="text" autocomplete="off" placeholder="e.g. 1234567"/>
+        <input id="inputChannel" type="text" list="channelSuggestions" autocomplete="off" placeholder="e.g. 1234567"/>
+        <datalist id="channelSuggestions"></datalist>
       </div>
       <div class="field">
         <label>Read API Key</label>
-        <input id="inputKey" type="text" autocomplete="off" placeholder="ThingSpeak Read API Key"/>
+        <input id="inputKey" type="text" list="keySuggestions" autocomplete="off" placeholder="ThingSpeak Read API Key"/>
+        <datalist id="keySuggestions"></datalist>
       </div>
       <div class="field">
         <label>Rows</label>
@@ -377,6 +379,7 @@ function loadSaved() {
   try {
     document.getElementById('inputChannel').value = localStorage.getItem('ws_ch') || sessionStorage.getItem('ws_ch') || '';
     document.getElementById('inputKey').value = localStorage.getItem('ws_key') || sessionStorage.getItem('ws_key') || '';
+    updateSetupSuggestions();
   } catch(e) {}
 }
 
@@ -384,6 +387,18 @@ function saveCurrent(ch, key) {
   try {
     localStorage.setItem('ws_ch', ch);
     localStorage.setItem('ws_key', key);
+    localStorage.setItem('ws_last_ch', ch);
+    localStorage.setItem('ws_last_key', key);
+    updateSetupSuggestions();
+  } catch(e) {}
+}
+
+function updateSetupSuggestions() {
+  try {
+    const ch = localStorage.getItem('ws_ch') || localStorage.getItem('ws_last_ch') || '';
+    const key = localStorage.getItem('ws_key') || localStorage.getItem('ws_last_key') || '';
+    document.getElementById('channelSuggestions').innerHTML = ch ? `<option value="${ch}"></option>` : '';
+    document.getElementById('keySuggestions').innerHTML = key ? `<option value="${key}"></option>` : '';
   } catch(e) {}
 }
 

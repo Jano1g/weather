@@ -571,11 +571,13 @@
     <div class="setup-sub">Connect to ThingSpeak</div>
     <div class="field-group">
       <label>Channel ID</label>
-      <input type="text" id="inputChannel" placeholder="e.g. 1234567" autocomplete="off"/>
+      <input type="text" id="inputChannel" list="channelSuggestions" placeholder="e.g. 1234567" autocomplete="off"/>
+      <datalist id="channelSuggestions"></datalist>
     </div>
     <div class="field-group">
       <label>Read API Key</label>
-      <input type="text" id="inputKey" placeholder="e.g. ABCDEFGHIJKLMNOP" autocomplete="off"/>
+      <input type="text" id="inputKey" list="keySuggestions" placeholder="e.g. ABCDEFGHIJKLMNOP" autocomplete="off"/>
+      <datalist id="keySuggestions"></datalist>
     </div>
     <button class="connect-btn" onclick="connect()">Connect →</button>
     <div class="setup-error" id="setupError"></div>
@@ -713,6 +715,9 @@ function saveSettings() {
     localStorage.setItem('ws_ch', CHANNEL_ID);
     localStorage.setItem('ws_key', API_KEY);
     localStorage.setItem('ws_alt', String(SEA_LEVEL_ALT_M));
+    localStorage.setItem('ws_last_ch', CHANNEL_ID);
+    localStorage.setItem('ws_last_key', API_KEY);
+    updateSetupSuggestions();
   } catch(e){}
 }
 function loadSettings() {
@@ -721,6 +726,15 @@ function loadSettings() {
     API_KEY = localStorage.getItem('ws_key') || sessionStorage.getItem('ws_key') || '';
     const a = parseFloat(localStorage.getItem('ws_alt') || sessionStorage.getItem('ws_alt') || '0');
     SEA_LEVEL_ALT_M = isNaN(a) ? 0 : a;
+  } catch(e){}
+}
+
+function updateSetupSuggestions() {
+  try {
+    const ch = localStorage.getItem('ws_ch') || localStorage.getItem('ws_last_ch') || '';
+    const key = localStorage.getItem('ws_key') || localStorage.getItem('ws_last_key') || '';
+    document.getElementById('channelSuggestions').innerHTML = ch ? `<option value="${ch}"></option>` : '';
+    document.getElementById('keySuggestions').innerHTML = key ? `<option value="${key}"></option>` : '';
   } catch(e){}
 }
 
@@ -1008,6 +1022,9 @@ function resetSettings() {
   document.getElementById('altitudeM').value = '';
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('setupScreen').style.display = 'flex';
+  document.getElementById('inputChannel').value = '';
+  document.getElementById('inputKey').value = '';
+  updateSetupSuggestions();
 }
 
 ['inputChannel','inputKey'].forEach(id =>
@@ -1047,6 +1064,7 @@ document.getElementById('altitudeM').addEventListener('change', async () => {
 
 // Auto-connect if cached
 loadSettings();
+updateSetupSuggestions();
 document.getElementById('altitudeM').value = SEA_LEVEL_ALT_M ? String(SEA_LEVEL_ALT_M) : '';
 flatpickr('#gFrom', {
   enableTime: true,
