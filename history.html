@@ -599,7 +599,7 @@ function renderPage(totalLoaded) {
 
   if (!filteredFeeds.length) {
     tbody.innerHTML = '<tr><td colspan="7" style="color:#5a7a99;padding:1rem 0;">No rows in selected date range.</td></tr>';
-    meta.textContent = `Loaded ${totalLoaded} rows, showing 0 after date filter. Rain logic: raw < ${RAIN_WET_THRESHOLD} = YES (wet).`;
+    meta.textContent = `Loaded ${totalLoaded} rows, showing 0 after date filter.`;
     document.getElementById('pagerInfo').textContent = 'Page 1 / 1';
     document.getElementById('btnPrev').disabled = true;
     document.getElementById('btnNext').disabled = true;
@@ -623,7 +623,7 @@ function renderPage(totalLoaded) {
   `).join('');
 
   tbody.innerHTML = out;
-  meta.textContent = `Loaded ${totalLoaded} rows, showing ${filteredFeeds.length} after date filter. Rain logic: raw < ${RAIN_WET_THRESHOLD} = YES (wet).`;
+  meta.textContent = `Loaded ${totalLoaded} rows, showing ${filteredFeeds.length} after date filter.`;
   document.getElementById('pagerInfo').textContent = `Page ${currentPage} / ${totalPages}`;
   document.getElementById('btnPrev').disabled = currentPage <= 1;
   document.getElementById('btnNext').disabled = currentPage >= totalPages;

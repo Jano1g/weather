@@ -939,7 +939,7 @@ async function refresh() {
     const presAdjusted = toSeaLevelPressure(latest.field4);
     setCard('valPres',  'subPres',  presAdjusted, 1);
     ensurePressureUnit();
-    document.getElementById('subPres').textContent = SEA_LEVEL_ALT_M ? `sea-level @ ${SEA_LEVEL_ALT_M.toFixed(0)} m · hPa` : 'latest reading · hPa';
+    document.getElementById('subPres').textContent = SEA_LEVEL_ALT_M ? `sea-level @ ${SEA_LEVEL_ALT_M.toFixed(0)} m` : 'latest reading';
     setRainCard(latest.field5);
     setWifiStatus(latest.field6);
 
